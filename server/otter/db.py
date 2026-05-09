@@ -33,6 +33,10 @@ def init_db() -> None:
     _engine = make_engine()
     Base.metadata.create_all(_engine)
     _SessionLocal = sessionmaker(bind=_engine, autoflush=False, autocommit=False, future=True)
+    from otter.seed import seed_templates
+
+    with _SessionLocal() as s:
+        seed_templates(s)
 
 
 def get_session() -> Iterator[Session]:

@@ -19,6 +19,11 @@ def db_path(tmp_path: Path) -> Path:
 def engine(db_path: Path):
     engine = create_engine(f"sqlite:///{db_path}", future=True)
     Base.metadata.create_all(engine)
+    SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
+    from otter.seed import seed_templates
+
+    with SessionLocal() as s:
+        seed_templates(s)
     return engine
 
 

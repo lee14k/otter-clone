@@ -24,13 +24,13 @@ def test_create_lecture_with_segments(session):
 
 
 def test_summary_template_default_flag(session):
-    tpl = SummaryTemplate(name="Study Guide", prompt="...{transcript}...", is_default=True)
+    tpl = SummaryTemplate(name="Custom Guide", prompt="...{transcript}...", is_default=True)
     session.add(tpl)
     session.commit()
 
     rows = session.query(SummaryTemplate).filter_by(is_default=True).all()
-    assert len(rows) == 1
-    assert rows[0].name == "Study Guide"
+    assert len(rows) == 3  # Study Guide, Outline, and Custom Guide
+    assert "Custom Guide" in [r.name for r in rows]
 
 
 def test_summary_links_lecture_and_template(session):
