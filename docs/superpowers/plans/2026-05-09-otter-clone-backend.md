@@ -163,6 +163,8 @@ dependencies = [
     "pydantic>=2.10",
     "anthropic>=0.40",
     "faster-whisper>=1.1.0",
+    # onnxruntime 1.26+ does not yet ship a macOS 26 (Tahoe) ARM wheel.
+    "onnxruntime>=1.20,<1.26",
     "python-multipart>=0.0.20",
 ]
 
