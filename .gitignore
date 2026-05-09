@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+.ruff_cache/
+
+# Local data
+data/audio/*
+!data/audio/.gitkeep
+data/*.db
+data/*.db-*
+
+# Local config
+.env
+.env.local
+
+# Editors
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Web build artifacts (used by Plan 2)
+web/node_modules/
+web/dist/
