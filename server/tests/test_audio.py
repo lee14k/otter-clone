@@ -47,3 +47,36 @@ def test_upload_audio_rejects_when_disk_full(client, audio_dir: Path, monkeypatc
         files={"audio": ("c.webm", b"x", "audio/webm")},
     )
     assert r.status_code == 507
+
+
+def test_get_audio_returns_file(client, audio_dir: Path):
+    created = client.post("/api/lectures", json={}).json()
+    payload = b"AUDIO" * 50
+    client.put(
+        f"/api/lectures/{created['id']}/audio",
+        files={"audio": ("c.webm", payload, "audio/webm")},
+    )
+    r = client.get(f"/api/lectures/{created['id']}/audio")
+    assert r.status_code == 200
+    assert r.content == payload
+    assert r.headers["content-type"] == "audio/webm"
+
+
+def test_get_audio_supports_range(client, audio_dir: Path):
+    created = client.post("/api/lectures", json={}).json()
+    payload = b"0123456789" * 10  # 100 bytes
+    client.put(
+        f"/api/lectures/{created['id']}/audio",
+        files={"audio": ("c.webm", payload, "audio/webm")},
+    )
+    r = client.get(
+        f"/api/lectures/{created['id']}/audio", headers={"Range": "bytes=10-19"}
+    )
+    assert r.status_code == 206
+    assert r.content == payload[10:20]
+
+
+def test_get_audio_404_when_missing(client, audio_dir: Path):
+    created = client.post("/api/lectures", json={}).json()
+    r = client.get(f"/api/lectures/{created['id']}/audio")
+    assert r.status_code == 404

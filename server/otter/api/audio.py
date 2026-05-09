@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from otter import storage
@@ -52,3 +55,16 @@ def upload_audio(
     session.commit()
 
     return {"id": lecture_id, "status": "transcribing"}
+
+
+@router.get("/{lecture_id}/audio")
+def get_audio(lecture_id: str, session: Session = Depends(get_session)) -> FileResponse:
+    lecture = session.get(Lecture, lecture_id)
+    if lecture is None or not lecture.audio_path:
+        raise HTTPException(status_code=404, detail="audio not found")
+
+    full = Path(storage.AUDIO_DIR.parent / lecture.audio_path)
+    if not full.exists():
+        raise HTTPException(status_code=404, detail="audio file missing on disk")
+
+    return FileResponse(full, media_type=lecture.audio_mime)
