@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -53,7 +53,10 @@ def create_app() -> FastAPI:
 
         @app.get("/{full_path:path}", include_in_schema=False)
         def spa_fallback(full_path: str) -> FileResponse:
-            del full_path  # path captured for catch-all; index.html handles client routing
+            # Don't let the SPA catch-all swallow unmatched /api/* routes —
+            # surfacing a JSON 404 is much easier to debug than HTML.
+            if full_path.startswith("api/") or full_path == "api":
+                raise HTTPException(status_code=404, detail="not found")
             return FileResponse(WEB_DIST / "index.html")
 
     return app

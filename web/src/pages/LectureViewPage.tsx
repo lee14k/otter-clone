@@ -23,11 +23,15 @@ export default function LectureViewPage() {
   });
 
   // When polling flips to ready or failed, refetch the lecture detail
+  // Only re-run when poll.status flips. Depending on the whole `lecture`
+  // object would refire on every render (useApi returns a new object each
+  // time) and cause an infinite refetch loop. `lecture.refresh` is stable.
   useEffect(() => {
     if (poll.status === "ready" || poll.status === "failed") {
       void lecture.refresh();
     }
-  }, [poll.status, lecture]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [poll.status, lecture.refresh]);
 
   const audioRef = useRef<HTMLAudioElement>(null);
   const segments = lecture.data?.segments ?? [];

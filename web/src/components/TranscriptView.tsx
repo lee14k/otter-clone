@@ -43,8 +43,16 @@ export default function TranscriptView({ segments, activeIndex, onSeek }: Props)
               itemRefs.current[i] = el;
             }}
             data-active={isActive ? "true" : "false"}
+            role="button"
+            tabIndex={0}
             onClick={() => onSeek(s.start_sec)}
-            className={`flex gap-3 px-3 py-1.5 rounded cursor-pointer ${
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onSeek(s.start_sec);
+              }
+            }}
+            className={`flex gap-3 px-3 py-1.5 rounded cursor-pointer focus:outline-none focus:ring-2 focus:ring-slate-400 ${
               isActive ? "bg-amber-100" : "hover:bg-slate-100"
             }`}
           >
