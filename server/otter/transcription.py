@@ -9,7 +9,8 @@ from sqlalchemy.orm import Session
 
 from otter import storage
 from otter.config import load_config
-from otter.models import Lecture, TranscriptSegment
+from otter.models import Lecture, Summary, SummaryTemplate, TranscriptSegment
+from otter.summarization import generate_summary
 
 
 @dataclass(frozen=True)
@@ -92,6 +93,47 @@ def run_transcription_job(
         lecture.status = "ready"
         lecture.error = None
         session.commit()
+        _generate_default_summaries(session, lecture)
     finally:
         if close_session:
             session.close()
+
+
+def _anthropic_client():
+    from anthropic import Anthropic
+
+    cfg = load_config()
+    if not cfg.anthropic_api_key:
+        return None
+    return Anthropic(api_key=cfg.anthropic_api_key)
+
+
+def _generate_default_summaries(session: Session, lecture: Lecture) -> None:
+    client = _anthropic_client()
+    if client is None:
+        return  # no key — skip silently; user can generate later
+
+    cfg = load_config()
+    transcript = "\n".join(s.text for s in lecture.segments)
+    templates = (
+        session.query(SummaryTemplate).filter(SummaryTemplate.is_default.is_(True)).all()
+    )
+    for tpl in templates:
+        try:
+            content = generate_summary(
+                client=client,
+                model=cfg.summary_model,
+                template_prompt=tpl.prompt,
+                transcript=transcript,
+            )
+        except Exception:  # noqa: BLE001
+            continue  # one template failing should not block others
+        session.add(
+            Summary(
+                lecture_id=lecture.id,
+                template_id=tpl.id,
+                content=content,
+                model=cfg.summary_model,
+            )
+        )
+    session.commit()
