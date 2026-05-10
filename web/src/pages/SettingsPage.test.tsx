@@ -18,14 +18,22 @@ describe("SettingsPage", () => {
     });
   }
 
+  const defaultSettings = {
+    whisper_model: "large-v3",
+    summary_model: "claude-opus-4-7",
+    anthropic_key_set: true,
+  };
+
+  function mockFetchByUrl(overrides: Record<string, unknown> = {}) {
+    fetchMock.mockImplementation((url: string) => {
+      if (url.endsWith("/api/templates")) return Promise.resolve(jsonResponse([]));
+      if (url.endsWith("/api/settings")) return Promise.resolve(jsonResponse({ ...defaultSettings, ...overrides }));
+      return Promise.resolve(jsonResponse(null, 404));
+    });
+  }
+
   it("loads current settings on mount", async () => {
-    fetchMock.mockResolvedValue(
-      jsonResponse({
-        whisper_model: "large-v3",
-        summary_model: "claude-opus-4-7",
-        anthropic_key_set: true,
-      }),
-    );
+    mockFetchByUrl();
     render(<SettingsPage />);
     await waitFor(() =>
       expect(screen.getByText(/key is configured/i)).toBeInTheDocument(),
@@ -35,28 +43,22 @@ describe("SettingsPage", () => {
 
   it("submits a new key and shows confirmation", async () => {
     const user = userEvent.setup();
-    fetchMock
-      .mockResolvedValueOnce(
-        jsonResponse({
-          whisper_model: "large-v3",
-          summary_model: "claude-opus-4-7",
-          anthropic_key_set: false,
-        }),
-      )
-      .mockResolvedValueOnce(
-        jsonResponse({
-          whisper_model: "large-v3",
-          summary_model: "claude-opus-4-7",
-          anthropic_key_set: true,
-        }),
-      )
-      .mockResolvedValueOnce(
-        jsonResponse({
-          whisper_model: "large-v3",
-          summary_model: "claude-opus-4-7",
-          anthropic_key_set: true,
-        }),
-      );
+    let settingsCallCount = 0;
+    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+      if (url.endsWith("/api/templates")) return Promise.resolve(jsonResponse([]));
+      if (url.endsWith("/api/settings")) {
+        if (init?.method === "PATCH") {
+          return Promise.resolve(jsonResponse({ ...defaultSettings, anthropic_key_set: true }));
+        }
+        // GET
+        settingsCallCount++;
+        const keySet = settingsCallCount > 1;
+        return Promise.resolve(
+          jsonResponse({ ...defaultSettings, anthropic_key_set: keySet }),
+        );
+      }
+      return Promise.resolve(jsonResponse(null, 404));
+    });
 
     render(<SettingsPage />);
     await waitFor(() =>
@@ -69,8 +71,10 @@ describe("SettingsPage", () => {
     await waitFor(() =>
       expect(screen.getByText(/key is configured/i)).toBeInTheDocument(),
     );
-    expect(fetchMock).toHaveBeenCalledTimes(3);
-    const patchCall = fetchMock.mock.calls[1];
+    const patchCall = fetchMock.mock.calls.find(
+      (c: [string, RequestInit?]) => c[1]?.method === "PATCH",
+    );
+    expect(patchCall).toBeDefined();
     expect(patchCall[1]).toMatchObject({ method: "PATCH" });
   });
 });

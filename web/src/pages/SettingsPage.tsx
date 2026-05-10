@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { api, ApiError } from "@/api";
 import { useApi } from "@/hooks/useApi";
+import TemplateEditor from "@/components/TemplateEditor";
 
 const WHISPER_MODELS = [
   "large-v3",
@@ -18,6 +19,7 @@ const SUMMARY_MODELS = [
 
 export default function SettingsPage() {
   const settings = useApi(() => api.getSettings(), []);
+  const templates = useApi(() => api.listTemplates(), []);
   const [keyInput, setKeyInput] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -111,6 +113,17 @@ export default function SettingsPage() {
             ))}
           </select>
         </label>
+      </section>
+
+      <section className="space-y-2">
+        {templates.data && (
+          <TemplateEditor
+            templates={templates.data}
+            onChanged={async () => {
+              await templates.refresh();
+            }}
+          />
+        )}
       </section>
 
       {saveError && <p className="text-red-700 text-sm">{saveError}</p>}
