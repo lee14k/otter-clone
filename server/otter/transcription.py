@@ -56,31 +56,42 @@ def run_transcription_job(
     lecture_id: str,
     session_factory: Callable[[], Session],
     transcriber: Transcriber | None = None,
+    close_session: bool = False,
 ) -> None:
+    """Transcribe a lecture and persist the result.
+
+    ``close_session=True`` is for production where ``session_factory`` creates a
+    fresh session that this function owns. Tests pass ``close_session=False``
+    (the default) because they share their fixture's session.
+    """
     session = session_factory()
     transcriber = transcriber or FasterWhisperTranscriber()
-    lecture = session.get(Lecture, lecture_id)
-    if lecture is None:
-        return
-    audio_full = storage.AUDIO_DIR.parent / lecture.audio_path
     try:
-        segments, duration = transcriber.transcribe(audio_full)
-    except Exception as exc:  # noqa: BLE001
-        lecture.status = "failed"
-        lecture.error = str(exc)
-        session.commit()
-        return
+        lecture = session.get(Lecture, lecture_id)
+        if lecture is None:
+            return
+        audio_full = storage.AUDIO_DIR.parent / lecture.audio_path
+        try:
+            segments, duration = transcriber.transcribe(audio_full)
+        except Exception as exc:  # noqa: BLE001
+            lecture.status = "failed"
+            lecture.error = str(exc)
+            session.commit()
+            return
 
-    for s in segments:
-        session.add(
-            TranscriptSegment(
-                lecture_id=lecture.id,
-                start_sec=s.start_sec,
-                end_sec=s.end_sec,
-                text=s.text,
+        for s in segments:
+            session.add(
+                TranscriptSegment(
+                    lecture_id=lecture.id,
+                    start_sec=s.start_sec,
+                    end_sec=s.end_sec,
+                    text=s.text,
+                )
             )
-        )
-    lecture.duration_sec = int(duration)
-    lecture.status = "ready"
-    lecture.error = None
-    session.commit()
+        lecture.duration_sec = int(duration)
+        lecture.status = "ready"
+        lecture.error = None
+        session.commit()
+    finally:
+        if close_session:
+            session.close()

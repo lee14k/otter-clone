@@ -1840,14 +1840,15 @@ def upload_audio(
     get_runner().submit(
         run_transcription_job,
         lecture_id,
-        session_factory=lambda: next(_db.get_session()),
+        session_factory=_db.make_session,
         transcriber=transcriber,
+        close_session=True,
     )
 
     return {"id": lecture_id, "status": "transcribing"}
 ```
 
-The `next(_db.get_session())` extracts a session from the generator dependency for use outside of a request context.
+`_db.make_session()` returns a fresh `Session` that the caller owns. The background job passes `close_session=True` so `run_transcription_job` cleans it up in `finally`. (`get_session` is the FastAPI dependency-injection generator and shouldn't be called manually.)
 
 - [ ] **Step 5: Mount the status router**
 

@@ -46,3 +46,13 @@ def get_session() -> Iterator[Session]:
         yield s
     finally:
         s.close()
+
+
+def make_session() -> Session:
+    """Create a new Session — caller is responsible for closing it.
+
+    Use this for background jobs and any place that runs outside the FastAPI
+    request lifecycle. ``get_session`` is for FastAPI dependency injection.
+    """
+    assert _SessionLocal is not None, "init_db must be called before make_session"
+    return _SessionLocal()
