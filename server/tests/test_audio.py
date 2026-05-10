@@ -80,3 +80,35 @@ def test_get_audio_404_when_missing(client, audio_dir: Path):
     created = client.post("/api/lectures", json={}).json()
     r = client.get(f"/api/lectures/{created['id']}/audio")
     assert r.status_code == 404
+
+
+import time
+
+from otter.transcription import Segment
+
+
+def test_upload_triggers_transcription_job(client, audio_dir, monkeypatch):
+    calls: list[str] = []
+
+    class Fake:
+        def transcribe(self, path):
+            calls.append(str(path))
+            return [Segment(0.0, 1.0, "hi")], 1.0
+
+    monkeypatch.setattr("otter.api.audio._make_transcriber", lambda: Fake())
+
+    created = client.post("/api/lectures", json={}).json()
+    client.put(
+        f"/api/lectures/{created['id']}/audio",
+        files={"audio": ("c.webm", b"x" * 32, "audio/webm")},
+    )
+
+    for _ in range(50):
+        if client.get(f"/api/lectures/{created['id']}/status").json()["status"] == "ready":
+            break
+        time.sleep(0.05)
+
+    assert len(calls) == 1
+    detail = client.get(f"/api/lectures/{created['id']}").json()
+    assert detail["status"] == "ready"
+    assert detail["segments"][0]["text"] == "hi"

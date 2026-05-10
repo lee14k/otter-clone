@@ -7,6 +7,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from otter.db import Base, get_session
+from otter.jobs import reset_runner
 from otter.main import create_app
 
 
@@ -61,5 +62,6 @@ def client(engine) -> Iterator[TestClient]:
         with TestClient(app) as c:
             yield c
     finally:
+        reset_runner()
         _db._engine = _orig_engine
         _db._SessionLocal = _orig_session_local

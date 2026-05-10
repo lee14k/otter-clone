@@ -6,9 +6,12 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
+from otter import db as _db
 from otter import storage
 from otter.db import get_session
+from otter.jobs import get_runner
 from otter.models import Lecture
+from otter.transcription import FasterWhisperTranscriber, run_transcription_job
 
 router = APIRouter(prefix="/api/lectures", tags=["audio"])
 
@@ -25,6 +28,10 @@ _MIME_TO_EXT = {
 
 def _ext_for_mime(mime: str) -> str:
     return _MIME_TO_EXT.get(mime, "bin")
+
+
+def _make_transcriber():
+    return FasterWhisperTranscriber()
 
 
 @router.put("/{lecture_id}/audio", status_code=status.HTTP_202_ACCEPTED)
@@ -52,7 +59,17 @@ def upload_audio(
     lecture.audio_path = str(path.relative_to(storage.AUDIO_DIR.parent))
     lecture.audio_mime = mime
     lecture.status = "transcribing"
+    lecture.error = None
     session.commit()
+
+    transcriber = _make_transcriber()
+    get_runner().submit(
+        run_transcription_job,
+        lecture_id,
+        session_factory=_db.make_session,
+        transcriber=transcriber,
+        close_session=True,
+    )
 
     return {"id": lecture_id, "status": "transcribing"}
 
