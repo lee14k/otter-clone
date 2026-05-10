@@ -2,6 +2,25 @@ from pathlib import Path
 
 import pytest
 
+from otter.transcription import Segment
+
+
+class _NoopTranscriber:
+    """Default test transcriber — never loads a real model.
+
+    Tests that need a specific transcriber output should monkeypatch
+    ``otter.api.audio._make_transcriber`` themselves.
+    """
+
+    def transcribe(self, path: Path) -> tuple[list[Segment], float]:
+        return [], 0.0
+
+
+@pytest.fixture(autouse=True)
+def _stub_transcriber(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Prevent every audio-upload test from spawning a real faster-whisper job."""
+    monkeypatch.setattr("otter.api.audio._make_transcriber", lambda: _NoopTranscriber())
+
 
 @pytest.fixture
 def audio_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
@@ -83,8 +102,6 @@ def test_get_audio_404_when_missing(client, audio_dir: Path):
 
 
 import time
-
-from otter.transcription import Segment
 
 
 def test_upload_triggers_transcription_job(client, audio_dir, monkeypatch):

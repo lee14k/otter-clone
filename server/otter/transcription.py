@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -11,6 +12,8 @@ from otter import storage
 from otter.config import load_config
 from otter.models import Lecture, Summary, SummaryTemplate, TranscriptSegment
 from otter.summarization import generate_summary
+
+log = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -70,11 +73,14 @@ def run_transcription_job(
     try:
         lecture = session.get(Lecture, lecture_id)
         if lecture is None:
+            log.warning("transcription job: lecture %s not found", lecture_id)
             return
         audio_full = storage.AUDIO_DIR.parent / lecture.audio_path
+        log.info("transcribing lecture %s from %s", lecture_id, audio_full)
         try:
             segments, duration = transcriber.transcribe(audio_full)
         except Exception as exc:  # noqa: BLE001
+            log.exception("transcription failed for lecture %s", lecture_id)
             lecture.status = "failed"
             lecture.error = str(exc)
             session.commit()
@@ -93,6 +99,12 @@ def run_transcription_job(
         lecture.status = "ready"
         lecture.error = None
         session.commit()
+        log.info(
+            "transcription complete for lecture %s (%d segments, %.1fs)",
+            lecture_id,
+            len(segments),
+            duration,
+        )
         _generate_default_summaries(session, lecture)
     finally:
         if close_session:
@@ -111,7 +123,11 @@ def _anthropic_client():
 def _generate_default_summaries(session: Session, lecture: Lecture) -> None:
     client = _anthropic_client()
     if client is None:
-        return  # no key — skip silently; user can generate later
+        log.info(
+            "auto-summary skipped for lecture %s: no Anthropic key configured",
+            lecture.id,
+        )
+        return
 
     cfg = load_config()
     transcript = "\n".join(s.text for s in lecture.segments)
@@ -127,7 +143,12 @@ def _generate_default_summaries(session: Session, lecture: Lecture) -> None:
                 transcript=transcript,
             )
         except Exception:  # noqa: BLE001
-            continue  # one template failing should not block others
+            log.exception(
+                "auto-summary failed for lecture %s template %s; continuing with others",
+                lecture.id,
+                tpl.name,
+            )
+            continue
         session.add(
             Summary(
                 lecture_id=lecture.id,
