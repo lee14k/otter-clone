@@ -12,7 +12,7 @@ async def lifespan(app: FastAPI):
 
 
 def create_app() -> FastAPI:
-    from otter.api import audio, lectures, settings, status as status_router
+    from otter.api import audio, lectures, settings, status as status_router, templates
 
     app = FastAPI(
         title="Otter",
@@ -24,6 +24,7 @@ def create_app() -> FastAPI:
     app.include_router(audio.router)
     app.include_router(status_router.router)
     app.include_router(settings.router)
+    app.include_router(templates.router)
 
     @app.get("/api/health")
     def health() -> dict[str, str]:
