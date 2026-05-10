@@ -72,9 +72,9 @@ describe("SettingsPage", () => {
       expect(screen.getByText(/key is configured/i)).toBeInTheDocument(),
     );
     const patchCall = fetchMock.mock.calls.find(
-      (c: [string, RequestInit?]) => c[1]?.method === "PATCH",
+      (c) => (c[1] as RequestInit | undefined)?.method === "PATCH",
     );
     expect(patchCall).toBeDefined();
-    expect(patchCall[1]).toMatchObject({ method: "PATCH" });
+    expect((patchCall as unknown[])[1]).toMatchObject({ method: "PATCH" });
   });
 });
